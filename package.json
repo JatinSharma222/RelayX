@@ -1,0 +1,13 @@
+{
+  "name": "RelayX",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "bun --filter @app/web dev",
+    "dev:server": "bun --filter @app/server dev",
+    "dev:ws": "bun --filter @app/ws dev"
+  }
+}

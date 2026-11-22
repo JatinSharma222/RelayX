@@ -1,0 +1,10 @@
+{
+  "name": "@app/server",
+  "version": "1.0.0",
+  "dependencies": {
+    "@repo/shared": "workspace:*"
+  },
+  "scripts": {
+    "dev": "bun --watch src/index.ts"
+  }
+}

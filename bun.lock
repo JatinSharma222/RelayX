@@ -1,0 +1,43 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "relayx",
+    },
+    "apps/server": {
+      "name": "@app/server",
+      "version": "1.0.0",
+      "dependencies": {
+        "@repo/shared": "workspace:*",
+      },
+    },
+    "apps/web": {
+      "name": "@app/web",
+      "version": "1.0.0",
+    },
+    "apps/ws": {
+      "name": "@app/ws",
+      "version": "1.0.0",
+    },
+    "packages/database": {
+      "name": "@repo/database",
+      "version": "1.0.0",
+    },
+    "packages/shared": {
+      "name": "@repo/shared",
+      "version": "1.0.0",
+    },
+  },
+  "packages": {
+    "@app/server": ["@app/server@workspace:apps/server"],
+
+    "@app/web": ["@app/web@workspace:apps/web"],
+
+    "@app/ws": ["@app/ws@workspace:apps/ws"],
+
+    "@repo/database": ["@repo/database@workspace:packages/database"],
+
+    "@repo/shared": ["@repo/shared@workspace:packages/shared"],
+  }
+}
