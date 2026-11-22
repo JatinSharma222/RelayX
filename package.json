@@ -8,9 +8,13 @@
   "scripts": {
     "dev:web": "bun --filter @app/web dev",
     "dev:server": "bun --filter @app/server dev",
-    "dev:ws": "bun --filter @app/ws dev"
+    "dev:ws": "bun --filter @app/ws dev",
+    "db:generate": "bun --filter @repo/database db:generate",
+    "db:migrate": "bun --filter @repo/database db:migrate",
+    "db:push": "bun --filter @repo/database db:push",
+    "db:studio": "bun --filter @repo/database db:studio"
   },
   "dependencies": {
-    "typescipt": "^1.0.0"
+    "typescript": "^5.0.0"
   }
 }

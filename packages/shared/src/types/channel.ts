@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ServerIdSchema } from './server';
 
-export const ChannelIdSchema = z.string().cuid2();
+export const ChannelIdSchema = z.string().min(1);
 export type ChannelId = z.infer<typeof ChannelIdSchema>;
 
 export const ChannelTypeSchema = z.enum(['TEXT', 'VOICE']);

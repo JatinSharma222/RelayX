@@ -3,7 +3,7 @@ import { UserIdSchema, PublicUserSchema } from './user';
 import { ChannelIdSchema } from './channel';
 import { ConversationIdSchema } from './conversation';
 
-export const MessageIdSchema = z.string().cuid2();
+export const MessageIdSchema = z.string().min(1);
 export type MessageId = z.infer<typeof MessageIdSchema>;
 
 export const MessageSchema = z.object({

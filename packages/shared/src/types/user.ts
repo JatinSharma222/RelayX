@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const UserIdSchema = z.string().cuid2(); // or z.string().uuid()
+export const UserIdSchema = z.string().min(1);
 export type UserId = z.infer<typeof UserIdSchema>;
 
 // Full database entity
@@ -23,7 +23,9 @@ export const PublicUserSchema = UserSchema.pick({
   displayName: true,
   avatarUrl: true,
 });
-export type PublicUser = z.infer<typeof PublicUserSchema>; // Auth DTOs
+export type PublicUser = z.infer<typeof PublicUserSchema>;
+
+// Auth DTOs
 export const RegisterInputSchema = z.object({
   username: z.string().min(3).max(32).regex(/^[a-z0-9_]+$/),
   email: z.string().email(),

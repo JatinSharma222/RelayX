@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { UserIdSchema, PublicUserSchema } from './user';
 
-export const ConversationIdSchema = z.string().cuid2();
+export const ConversationIdSchema = z.string().min(1);
 export type ConversationId = z.infer<typeof ConversationIdSchema>;
 
 // Represents a 1:1 DM room
@@ -13,7 +13,7 @@ export const ConversationSchema = z.object({
 export type Conversation = z.infer<typeof ConversationSchema>;
 
 export const ConversationMemberSchema = z.object({
-  id: z.string().cuid2(),
+  id: z.string().min(1),
   conversationId: ConversationIdSchema,
   userId: UserIdSchema,
   joinedAt: z.date(),

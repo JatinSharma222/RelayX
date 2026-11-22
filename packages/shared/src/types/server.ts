@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { UserIdSchema, PublicUserSchema } from './user';
 
-export const ServerIdSchema = z.string().cuid2();
+export const ServerIdSchema = z.string().min(1);
 export type ServerId = z.infer<typeof ServerIdSchema>;
 
 export const ServerRoleSchema = z.enum(['OWNER', 'ADMIN', 'MEMBER']);
@@ -22,7 +22,7 @@ export type Server = z.infer<typeof ServerSchema>;
 
 // Server Member Model
 export const ServerMemberSchema = z.object({
-  id: z.string().cuid2(),
+  id: z.string().min(1),
   serverId: ServerIdSchema,
   userId: UserIdSchema,
   role: ServerRoleSchema,
