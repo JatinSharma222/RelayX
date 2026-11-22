@@ -9,5 +9,8 @@
     "dev:web": "bun --filter @app/web dev",
     "dev:server": "bun --filter @app/server dev",
     "dev:ws": "bun --filter @app/ws dev"
+  },
+  "dependencies": {
+    "typescipt": "^1.0.0"
   }
 }

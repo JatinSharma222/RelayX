@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "relayx",
+      "dependencies": {
+        "typescipt": "^1.0.0",
+      },
     },
     "apps/server": {
       "name": "@app/server",
@@ -19,6 +22,12 @@
     "apps/ws": {
       "name": "@app/ws",
       "version": "1.0.0",
+      "dependencies": {
+        "ws": "^8.23.0",
+      },
+      "devDependencies": {
+        "@types/ws": "^8.18.2",
+      },
     },
     "packages/database": {
       "name": "@repo/database",
@@ -27,6 +36,9 @@
     "packages/shared": {
       "name": "@repo/shared",
       "version": "1.0.0",
+      "dependencies": {
+        "zod": "^4.6.7",
+      },
     },
   },
   "packages": {
@@ -39,5 +51,17 @@
     "@repo/database": ["@repo/database@workspace:packages/database"],
 
     "@repo/shared": ["@repo/shared@workspace:packages/shared"],
+
+    "@types/node": ["@types/node@26.6.6", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog=="],
+
+    "@types/ws": ["@types/ws@8.18.2", "", { "dependencies": { "@types/node": "*" } }, "sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w=="],
+
+    "typescipt": ["typescipt@1.0.0", "", {}, "sha512-Rgg7DtWh0c0oJPz2p48B0hlINIkE5zxU5i+dGctkoiKjIu6twl0HXWzoy+mvp9bQfLJGx70zYuN6GK0S/x5Kxw=="],
+
+    "undici-types": ["undici-types@8.9.0", "", {}, "sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg=="],
+
+    "ws": ["ws@8.23.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-wCkmX8QMOrKjgO8HW2WyDbTSGeqkocxgDzS9iR79rEAexty6/2qzilx3Ag8Tqf9ykop3irLKle0MtVn5qjVnoQ=="],
+
+    "zod": ["zod@4.6.7", "", {}, "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="],
   }
 }
