@@ -23,6 +23,7 @@
       "name": "@app/ws",
       "version": "1.0.0",
       "dependencies": {
+        "@repo/shared": "workspace:*",
         "ws": "^8.23.0",
       },
       "devDependencies": {
