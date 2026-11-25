@@ -9,10 +9,11 @@ import type {
   ServerWsEvent,
   ClientWsEvent,
   PublicUser,
+  RoomType,
 } from "@repo/shared";
 
 import { ConnectionManager } from "../managers/connection-manager";
-import { RoomManager } from "../managers/room-manager";
+import { RoomManager, type RoomKey } from "../managers/room-manager";
 import { AuthAdapter } from "../auth/auth-adapter";
 
 export class WebSocketGateway {
@@ -103,7 +104,23 @@ export class WebSocketGateway {
         return;
       }
 
-      console.log("Authenticated event:", event.type);
+      if (event.type === "ROOM_JOIN") {
+        this.handleRoomJoin(
+          ws,
+          event.payload.roomId,
+          event.payload.roomType
+        );
+        return;
+      }
+
+      if (event.type === "ROOM_LEAVE") {
+        this.handleRoomLeave(
+          ws,
+          event.payload.roomId,
+          event.payload.roomType
+        );
+        return;
+      }
 
     } catch {
       this.send(ws, {
@@ -181,5 +198,25 @@ export class WebSocketGateway {
 
     console.log(`${user.username} disconnected`);
   }
-}
 
+
+  private handleRoomJoin(
+    ws: WebSocket,
+    roomId: string,
+    roomType: RoomType
+  ): void {
+    const roomKey: RoomKey = roomType === "CHANNEL" ? `channel:${roomId}` : `conversation:${roomId}`;
+
+    this.roomManager.joinRoom(roomKey, ws);
+  }
+
+  private handleRoomLeave(
+    ws: WebSocket,
+    roomId: string,
+    roomType: RoomType
+  ): void {
+    const roomKey: RoomKey = roomType === "CHANNEL" ? `channel:${roomId}` : `conversation:${roomId}`;
+
+    this.roomManager.leaveRoom(roomKey, ws);
+  }
+}
