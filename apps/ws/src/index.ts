@@ -1,16 +1,5 @@
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketGateway } from "./gateway/websocket-gateway";
 
-const wss = new WebSocketServer({
-  port: 8080
-});
+const PORT = Number(process.env.WS_PORT ?? 8080);
 
-wss.on('connection', function connection(ws) {
-  ws.on('error', console.error);
-
-  ws.on('message', function message(data: string) {
-    const parsedData = JSON.parse(data);
-    console.log("Message: ", parsedData.content);
-  })
-
-  ws.send("Hello from server");
-});
+new WebSocketGateway(PORT);
