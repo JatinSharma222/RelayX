@@ -2,6 +2,8 @@ import { type UserId, type PublicUser } from './user';
 import { type Message, type MessageId } from './message';
 import { type UserPresence } from './presence';
 
+export type RoomType = 'CHANNEL' | 'CONVERSATION';
+
 // ==========================================
 // Client -> Server Events
 // ==========================================
@@ -11,33 +13,26 @@ export type ClientWsEvent =
     payload: { token: string };
   }
   | {
-    type: 'ROOM_JOIN'; // Joins a channel or conversation room
-    payload: { roomId: string };
+    type: 'ROOM_JOIN';
+    payload: {
+      roomId: string;
+      roomType: RoomType;
+    };
   }
   | {
     type: 'ROOM_LEAVE';
-    payload: { roomId: string };
+    payload: {
+      roomId: string;
+      roomType: RoomType;
+    };
   }
   | {
     type: 'MESSAGE_SEND';
     payload: {
-      clientTempId: string; // Used for frontend optimistic rendering
-      roomId: string; // channelId or conversationId
-      isDm?: boolean;
-      content: string;
-    };
-  }
-  | {
-    type: 'TYPING_UPDATE';
-    payload: {
+      clientTempId: string;
       roomId: string;
-      isTyping: boolean;
-    };
-  }
-  | {
-    type: 'PRESENCE_SET';
-    payload: {
-      status: 'ONLINE' | 'IDLE' | 'DND';
+      roomType: RoomType;
+      content: string;
     };
   };
 
@@ -55,6 +50,7 @@ export type ServerWsEvent =
       message: Message;
       roomId: string;
       clientTempId?: string; // Reconciles optimistic UI in frontend
+      roomType: RoomType;
     };
   }
   | {
