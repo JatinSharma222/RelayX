@@ -82,6 +82,7 @@ export const messages = pgTable('messages', {
   channelId: text('channel_id').references(() => channels.id, { onDelete: 'cascade' }),
   conversationId: text('conversation_id').references(() => conversations.id, { onDelete: 'cascade' }),
   content: text('content').notNull(),
+  clientTempId: text('client_temp_id').notNull(),
   isEdited: boolean('is_edited').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -92,4 +93,6 @@ export const messages = pgTable('messages', {
     'message_target_check',
     sql`(${table.channelId} IS NOT NULL AND ${table.conversationId} IS NULL) OR (${table.channelId} IS NULL AND ${table.conversationId} IS NOT NULL)`
   ),
+  uniqueIndex('messages_sender_client_temp_idx')
+    .on(table.senderId, table.clientTempId),
 ]);

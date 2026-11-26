@@ -15,6 +15,7 @@
     "db:studio": "bun --filter @repo/database db:studio"
   },
   "dependencies": {
+    "@paralleldrive/cuid2": "paralleldrive/cuid2",
     "typescript": "^5.0.0"
   }
 }

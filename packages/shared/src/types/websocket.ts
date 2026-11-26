@@ -1,5 +1,7 @@
+
+
 import { type UserId, type PublicUser } from './user';
-import { type Message, type MessageId } from './message';
+import { type Message } from './message';
 import { type UserPresence } from './presence';
 
 export type RoomType = 'CHANNEL' | 'CONVERSATION';
@@ -7,10 +9,13 @@ export type RoomType = 'CHANNEL' | 'CONVERSATION';
 // ==========================================
 // Client -> Server Events
 // ==========================================
+
 export type ClientWsEvent =
   | {
     type: 'AUTH';
-    payload: { token: string };
+    payload: {
+      token: string;
+    };
   }
   | {
     type: 'ROOM_JOIN';
@@ -34,23 +39,47 @@ export type ClientWsEvent =
       roomType: RoomType;
       content: string;
     };
+  }
+  | {
+    type: 'TYPING_UPDATE';
+    payload: {
+      roomId: string;
+      isTyping: boolean;
+    };
+  }
+  | {
+    type: 'PRESENCE_SET';
+    payload: {
+      status: 'ONLINE' | 'IDLE' | 'DND';
+    };
   };
 
 // ==========================================
 // Server -> Client Events
 // ==========================================
+
 export type ServerWsEvent =
   | {
     type: 'AUTH_SUCCESS';
-    payload: { user: PublicUser };
+    payload: {
+      user: PublicUser;
+    };
   }
   | {
     type: 'MESSAGE_NEW';
     payload: {
       message: Message;
       roomId: string;
-      clientTempId?: string; // Reconciles optimistic UI in frontend
       roomType: RoomType;
+      clientTempId?: string;
+    };
+  }
+  | {
+    type: 'MESSAGE_ACK';
+    payload: {
+      clientTempId: string;
+      message: Message;
+      isDuplicate: boolean;
     };
   }
   | {
