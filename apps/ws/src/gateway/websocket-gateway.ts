@@ -15,6 +15,7 @@ import type {
 import { ConnectionManager } from "../managers/connection-manager";
 import { RoomManager, type RoomKey } from "../managers/room-manager";
 import { AuthAdapter } from "../auth/auth-adapter";
+import { MessageService } from "../services/message-service";
 
 export class WebSocketGateway {
   private wss: WebSocketServer;
@@ -26,12 +27,15 @@ export class WebSocketGateway {
   // Associates each authenticated socket with its user
   private authenticatedSockets = new Map<WebSocket, PublicUser>();
 
+  private messageService: MessageService;
+
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
 
     this.connectionManager = new ConnectionManager();
     this.roomManager = new RoomManager();
     this.authAdapter = new AuthAdapter();
+    this.messageService = new MessageService();
 
     this.initialize();
   }
@@ -122,12 +126,19 @@ export class WebSocketGateway {
         return;
       }
 
-    } catch {
+      if (event.type === "MESSAGE_SEND") {
+        await this.handleMessageSend(ws, event);
+        return;
+      }
+
+    } catch (error) {
+      console.error("WebSocket message handling error:", error);
+
       this.send(ws, {
         type: "ERROR",
         payload: {
-          code: "BAD_REQUEST",
-          message: "Invalid JSON",
+          code: "INTERNAL_ERROR",
+          message: "Failed to process event",
         },
       });
     }
@@ -218,5 +229,69 @@ export class WebSocketGateway {
     const roomKey: RoomKey = roomType === "CHANNEL" ? `channel:${roomId}` : `conversation:${roomId}`;
 
     this.roomManager.leaveRoom(roomKey, ws);
+  }
+
+  private async handleMessageSend(
+    ws: WebSocket,
+    event: Extract<ClientWsEvent, { type: "MESSAGE_SEND" }>
+  ): Promise<void> {
+
+    const user = this.authenticatedSockets.get(ws);
+
+    if (!user) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      });
+      return;
+    }
+
+    const result = await this.messageService.createMessage({
+      senderId: user.id,
+      roomId: event.payload.roomId,
+      roomType: event.payload.roomType,
+      clientTempId: event.payload.clientTempId,
+      content: event.payload.content,
+    });
+
+    this.send(ws, {
+      type: "MESSAGE_ACK",
+      payload: {
+        clientTempId: event.payload.clientTempId,
+        message: result.message,
+        isDuplicate: result.isDuplicate,
+      },
+    });
+
+    if (result.isDuplicate) {
+      return;
+    }
+
+    const roomKey: RoomKey =
+      event.payload.roomType === "CHANNEL"
+        ? `channel:${event.payload.roomId}`
+        : `conversation:${event.payload.roomId}`;
+
+    const members = this.roomManager.getRoomMembers(roomKey);
+
+    for (const memberSocket of members) {
+      if (memberSocket === ws) {
+        continue;
+      }
+
+      this.send(memberSocket, {
+        type: "MESSAGE_NEW",
+        payload: {
+          message: result.message,
+          roomId: event.payload.roomId,
+          roomType: event.payload.roomType,
+          clientTempId: event.payload.clientTempId,
+        },
+      });
+    }
+
   }
 }
