@@ -16,6 +16,7 @@ import { ConnectionManager } from "../managers/connection-manager";
 import { RoomManager, type RoomKey } from "../managers/room-manager";
 import { AuthAdapter } from "../auth/auth-adapter";
 import { MessageService } from "../services/message-service";
+import { RoomAuthorizationService } from "../services/room-authorization-service";
 
 export class WebSocketGateway {
   private wss: WebSocketServer;
@@ -29,6 +30,8 @@ export class WebSocketGateway {
 
   private messageService: MessageService;
 
+  private roomAuthorizationService: RoomAuthorizationService;
+
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
 
@@ -36,6 +39,7 @@ export class WebSocketGateway {
     this.roomManager = new RoomManager();
     this.authAdapter = new AuthAdapter();
     this.messageService = new MessageService();
+    this.roomAuthorizationService = new RoomAuthorizationService();
 
     this.initialize();
   }
@@ -109,7 +113,7 @@ export class WebSocketGateway {
       }
 
       if (event.type === "ROOM_JOIN") {
-        this.handleRoomJoin(
+        await this.handleRoomJoin(
           ws,
           event.payload.roomId,
           event.payload.roomType
@@ -215,11 +219,60 @@ export class WebSocketGateway {
   }
 
 
-  private handleRoomJoin(
+  private async handleRoomJoin(
     ws: WebSocket,
     roomId: string,
     roomType: RoomType
-  ): void {
+  ): Promise<void> {
+
+    const user = this.authenticatedSockets.get(ws);
+
+    if (!user) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      });
+      return;
+    }
+
+    if (roomType === "CHANNEL") {
+      const hasAccess =
+        await this.roomAuthorizationService.canAccessChannel(
+          user.id,
+          roomId
+        );
+
+      if (!hasAccess) {
+        this.send(ws, {
+          type: "ERROR",
+          payload: {
+            code: "FORBIDDEN",
+            message: "You don't have access to this channel",
+          },
+        });
+        return;
+      }
+    } else {
+      const hasAccess = await this.roomAuthorizationService.canAccessConversation(
+        user.id,
+        roomId
+      );
+
+      if (!hasAccess) {
+        this.send(ws, {
+          type: "ERROR",
+          payload: {
+            code: "FORBIDDEN",
+            message: "You don't have access to this conversation",
+          },
+        });
+        return;
+      }
+    }
+
     const roomKey: RoomKey = roomType === "CHANNEL" ? `channel:${roomId}` : `conversation:${roomId}`;
 
     this.roomManager.joinRoom(roomKey, ws);
@@ -252,6 +305,42 @@ export class WebSocketGateway {
       });
       return;
     }
+
+    if (event.payload.roomType === "CHANNEL") {
+      const hasAccess =
+        await this.roomAuthorizationService.canAccessChannel(
+          user.id,
+          event.payload.roomId
+        );
+
+      if (!hasAccess) {
+        this.send(ws, {
+          type: "ERROR",
+          payload: {
+            code: "FORBIDDEN",
+            message: "You don't have access to this channel",
+          },
+        });
+        return;
+      }
+    } else {
+      const hasAccess = await this.roomAuthorizationService.canAccessConversation(
+        user.id,
+        event.payload.roomId
+      );
+
+      if (!hasAccess) {
+        this.send(ws, {
+          type: "ERROR",
+          payload: {
+            code: "FORBIDDEN",
+            message: "You don't have access to this conversation",
+          },
+        });
+        return;
+      }
+    }
+
 
     const result = await this.messageService.createMessage({
       senderId: user.id,
@@ -298,10 +387,60 @@ export class WebSocketGateway {
     }
   }
 
+
   private async handleHistoryRequest(
     ws: WebSocket,
     event: Extract<ClientWsEvent, { type: "HISTORY_REQUEST" }>
   ): Promise<void> {
+    const user = this.authenticatedSockets.get(ws);
+
+    if (!user) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      });
+      return;
+    }
+
+    if (event.payload.roomType === "CHANNEL") {
+      const hasAccess =
+        await this.roomAuthorizationService.canAccessChannel(
+          user.id,
+          event.payload.roomId
+        );
+
+      if (!hasAccess) {
+        this.send(ws, {
+          type: "ERROR",
+          payload: {
+            code: "FORBIDDEN",
+            message: "You don't have access to this channel",
+          },
+        });
+        return;
+      }
+    } else {
+      const hasAccess = await this.roomAuthorizationService.canAccessConversation(
+        user.id,
+        event.payload.roomId
+      );
+
+      if (!hasAccess) {
+        this.send(ws, {
+          type: "ERROR",
+          payload: {
+            code: "FORBIDDEN",
+            message: "You don't have access to this conversation",
+          },
+        });
+        return;
+      }
+    }
+
+
     const result = await this.messageService.getMessageHistory({
       roomId: event.payload.roomId,
       roomType: event.payload.roomType,
