@@ -131,6 +131,10 @@ export class WebSocketGateway {
         return;
       }
 
+      if (event.type === "HISTORY_REQUEST") {
+        await this.handleHistoryRequest(ws, event);
+        return;
+      }
     } catch (error) {
       console.error("WebSocket message handling error:", error);
 
@@ -292,6 +296,22 @@ export class WebSocketGateway {
         },
       });
     }
+  }
 
+  private async handleHistoryRequest(
+    ws: WebSocket,
+    event: Extract<ClientWsEvent, { type: "HISTORY_REQUEST" }>
+  ): Promise<void> {
+    const result = await this.messageService.getMessageHistory({
+      roomId: event.payload.roomId,
+      roomType: event.payload.roomType,
+      limit: event.payload.limit,
+      before: event.payload.before,
+    });
+
+    this.send(ws, {
+      type: "HISTORY_RESPONSE",
+      payload: result,
+    });
   }
 }

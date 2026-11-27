@@ -52,6 +52,15 @@ export type ClientWsEvent =
     payload: {
       status: 'ONLINE' | 'IDLE' | 'DND';
     };
+  }
+  | {
+    type: "HISTORY_REQUEST";
+    payload: {
+      roomId: string;
+      roomType: RoomType;
+      limit: number;
+      before?: string;
+    };
   };
 
 // ==========================================
@@ -100,5 +109,16 @@ export type ServerWsEvent =
     payload: {
       code: string;
       message: string;
+    };
+  }
+
+  | {
+    type: "HISTORY_RESPONSE";
+    payload: {
+      roomId: string;
+      roomType: RoomType;
+      messages: Message[];
+      hasMore: boolean;
+      nextCursor: string | null;
     };
   };
