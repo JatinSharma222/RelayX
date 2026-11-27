@@ -7,7 +7,7 @@ export type PresenceStatus = z.infer<typeof PresenceStatusSchema>;
 export interface UserPresence {
   userId: UserId;
   status: PresenceStatus;
-  lastSeenAt: string;
+  lastSeenAt: string | null;
 }
 
 export interface TypingEvent {

@@ -17,6 +17,7 @@ import { RoomManager, type RoomKey } from "../managers/room-manager";
 import { AuthAdapter } from "../auth/auth-adapter";
 import { MessageService } from "../services/message-service";
 import { RoomAuthorizationService } from "../services/room-authorization-service";
+import { PresenceManager } from "../managers/presence-manager";
 
 export class WebSocketGateway {
   private wss: WebSocketServer;
@@ -31,6 +32,7 @@ export class WebSocketGateway {
   private messageService: MessageService;
 
   private roomAuthorizationService: RoomAuthorizationService;
+  private presenceManager: PresenceManager;
 
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
@@ -40,6 +42,7 @@ export class WebSocketGateway {
     this.authAdapter = new AuthAdapter();
     this.messageService = new MessageService();
     this.roomAuthorizationService = new RoomAuthorizationService();
+    this.presenceManager = new PresenceManager();
 
     this.initialize();
   }
@@ -145,6 +148,11 @@ export class WebSocketGateway {
         return;
       }
 
+      if (event.type === "PRESENCE_SET") {
+        this.handlePresenceSet(ws, event);
+        return;
+      }
+
     } catch (error) {
       console.error("WebSocket message handling error:", error);
 
@@ -199,9 +207,15 @@ export class WebSocketGateway {
 
     const userId: UserId = user.id;
 
-    this.authenticatedSockets.set(ws, user);
+    const wasOnline = this.connectionManager.isOnline(userId);
 
+    this.authenticatedSockets.set(ws, user);
     this.connectionManager.addConnection(userId, ws);
+
+    if (!wasOnline) {
+      this.presenceManager.removeStatus(userId);
+      this.broadcastPresence(userId);
+    }
 
     this.send(ws, {
       type: "AUTH_SUCCESS",
@@ -217,6 +231,12 @@ export class WebSocketGateway {
     if (!user) return;
 
     this.connectionManager.removeConnection(user.id, ws);
+
+    if (!this.connectionManager.isOnline(user.id)) {
+      this.presenceManager.updateLastSeen(user.id);
+      this.broadcastPresence(user.id);
+    }
+
     this.roomManager.removeSocketFromAllRooms(ws);
 
     this.authenticatedSockets.delete(ws);
@@ -550,5 +570,62 @@ export class WebSocketGateway {
 
       this.send(memberSocket, typingEvent);
     }
+  }
+
+  private broadcastPresence(userId: UserId): void {
+    const presence = this.presenceManager.getUserPresence(
+      userId,
+      this.connectionManager
+    );
+
+    const event: ServerWsEvent = {
+      type: "PRESENCE_UPDATE",
+      payload: presence,
+    };
+
+    for (const [socket, user] of this.authenticatedSockets) {
+      if (user.id === userId) continue;
+
+      this.send(socket, event);
+    }
+  }
+
+  private handlePresenceSet(
+    ws: WebSocket,
+    event: Extract<ClientWsEvent, { type: "PRESENCE_SET" }>
+  ): void {
+    const user = this.authenticatedSockets.get(ws);
+
+    if (!user) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      });
+      return;
+    }
+
+    const { status } = event.payload;
+
+    if (!["ONLINE", "IDLE", "DND"].includes(status)) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "BAD_REQUEST",
+          message: "Invalid presence status",
+        },
+      });
+      return;
+    }
+
+    if (status === "ONLINE") {
+      this.presenceManager.removeStatus(user.id);
+    } else {
+      this.presenceManager.setStatus(user.id, status);
+    }
+
+    this.broadcastPresence(user.id);
   }
 }
