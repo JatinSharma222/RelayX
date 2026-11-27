@@ -139,6 +139,12 @@ export class WebSocketGateway {
         await this.handleHistoryRequest(ws, event);
         return;
       }
+
+      if (event.type === "TYPING_UPDATE") {
+        await this.handleTypingUpdate(ws, event);
+        return;
+      }
+
     } catch (error) {
       console.error("WebSocket message handling error:", error);
 
@@ -452,5 +458,97 @@ export class WebSocketGateway {
       type: "HISTORY_RESPONSE",
       payload: result,
     });
+  }
+
+  private async handleTypingUpdate(
+    ws: WebSocket,
+    event: Extract<ClientWsEvent, { type: "TYPING_UPDATE" }>
+  ): Promise<void> {
+    const user = this.authenticatedSockets.get(ws);
+
+    if (!user) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      });
+      return;
+
+    }
+    if (event.payload.roomType === "CHANNEL") {
+
+      const hasAccess =
+        await this.roomAuthorizationService.canAccessChannel(
+          user.id,
+          event.payload.roomId
+        );
+
+      if (!hasAccess) {
+        this.send(ws, {
+          type: "ERROR",
+          payload: {
+            code: "FORBIDDEN",
+            message: "You don't have access to this channel",
+          },
+        });
+        return;
+      }
+    } else {
+      const hasAccess = await this.roomAuthorizationService.canAccessConversation(
+        user.id,
+        event.payload.roomId
+      );
+
+      if (!hasAccess) {
+        this.send(ws, {
+          type: "ERROR",
+          payload: {
+            code: "FORBIDDEN",
+            message: "You don't have access to this conversation",
+          },
+        });
+        return;
+      }
+    }
+
+
+    const roomKey: RoomKey =
+      event.payload.roomType === "CHANNEL"
+        ? `channel:${event.payload.roomId}`
+        : `conversation:${event.payload.roomId}`;
+
+    const socketRooms = this.roomManager.getSocketRooms(ws);
+
+    if (!socketRooms.has(roomKey)) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "BAD_REQUEST",
+          message: "Join the room before sending typing updates",
+        },
+      });
+      return;
+    }
+
+    const members = this.roomManager.getRoomMembers(roomKey);
+
+    const typingEvent: ServerWsEvent = {
+      type: "TYPING_UPDATE",
+      payload: {
+        roomId: event.payload.roomId,
+        roomType: event.payload.roomType, // ADD THIS
+        userId: user.id,
+        username: user.username,
+        isTyping: event.payload.isTyping,
+      },
+    };
+
+    for (const memberSocket of members) {
+      if (memberSocket === ws) continue;
+
+      this.send(memberSocket, typingEvent);
+    }
   }
 }

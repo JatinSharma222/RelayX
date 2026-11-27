@@ -44,6 +44,7 @@ export type ClientWsEvent =
     type: 'TYPING_UPDATE';
     payload: {
       roomId: string;
+      roomType: RoomType;
       isTyping: boolean;
     };
   }
@@ -95,6 +96,7 @@ export type ServerWsEvent =
     type: 'TYPING_UPDATE';
     payload: {
       roomId: string;
+      roomType: RoomType;
       userId: UserId;
       username: string;
       isTyping: boolean;
