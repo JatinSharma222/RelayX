@@ -34,6 +34,8 @@ export class WebSocketGateway {
   private roomAuthorizationService: RoomAuthorizationService;
   private presenceManager: PresenceManager;
   private aliveSockets = new Map<WebSocket, boolean>();
+  private heartbeatInterval!: ReturnType<typeof setInterval>;
+  private isShuttingDown: boolean = false;
 
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
@@ -71,7 +73,7 @@ export class WebSocketGateway {
       });
     });
 
-    setInterval(() => {
+    this.heartbeatInterval = setInterval(() => {
       this.heartbeat();
     }, 30000);
 
@@ -658,6 +660,27 @@ export class WebSocketGateway {
 
       this.aliveSockets.set(client, false);
       client.ping();
+    }
+  }
+
+  public shutdown(): void {
+
+    if (this.isShuttingDown) {
+      return;
+    }
+
+    this.isShuttingDown = true;
+
+    clearInterval(this.heartbeatInterval);
+
+    // Stop accepting new connections
+    this.wss.close(() => {
+      console.log("WebSocket server closed");
+    });
+
+    // Gracefully close existing connections
+    for (const client of this.wss.clients) {
+      client.close(1001, "Server shutting down");
     }
   }
 
