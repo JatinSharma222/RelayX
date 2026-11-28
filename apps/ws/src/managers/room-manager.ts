@@ -11,7 +11,14 @@ export class RoomManager {
 
   private readonly socketRooms = new Map<WebSocket, Set<RoomKey>>();
 
-  public joinRoom(roomId: RoomKey, ws: WebSocket): void {
+  public joinRoom(roomId: RoomKey, ws: WebSocket): boolean {
+
+    const existingMembers = this.rooms.get(roomId);
+
+    if (existingMembers?.has(ws)) {
+      return false;
+    }
+
     let roomConnections = this.rooms.get(roomId);
 
     if (!roomConnections) {
@@ -29,6 +36,8 @@ export class RoomManager {
     }
 
     joinedRooms.add(roomId);
+
+    return true;
   }
 
   public leaveRoom(roomId: RoomKey, ws: WebSocket): void {

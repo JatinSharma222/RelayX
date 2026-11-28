@@ -393,7 +393,9 @@ export class WebSocketGateway {
 
     const roomKey: RoomKey = roomType === "CHANNEL" ? `channel:${roomId}` : `conversation:${roomId}`;
 
-    this.roomManager.joinRoom(roomKey, ws);
+    const joined = this.roomManager.joinRoom(roomKey, ws);
+
+    if (!joined) return;
   }
 
   private handleRoomLeave(
@@ -401,7 +403,45 @@ export class WebSocketGateway {
     roomId: string,
     roomType: RoomType
   ): void {
-    const roomKey: RoomKey = roomType === "CHANNEL" ? `channel:${roomId}` : `conversation:${roomId}`;
+    const user = this.authenticatedSockets.get(ws);
+
+    if (!user) return;
+
+    const session = this.typingManager.stopTyping(
+      user.id,
+      roomId,
+      roomType
+    );
+
+    if (session) {
+      const typingEvent: ServerWsEvent = {
+        type: "TYPING_UPDATE",
+        payload: {
+          roomId: session.roomId,
+          roomType: session.roomType,
+          userId: session.userId,
+          username: session.username,
+          isTyping: false,
+        },
+      };
+
+      const roomKey: RoomKey =
+        roomType === "CHANNEL"
+          ? `channel:${roomId}`
+          : `conversation:${roomId}`;
+
+      const members = this.roomManager.getRoomMembers(roomKey);
+
+      for (const memberSocket of members) {
+        if (memberSocket === ws) continue;
+        this.send(memberSocket, typingEvent);
+      }
+    }
+
+    const roomKey: RoomKey =
+      roomType === "CHANNEL"
+        ? `channel:${roomId}`
+        : `conversation:${roomId}`;
 
     this.roomManager.leaveRoom(roomKey, ws);
   }

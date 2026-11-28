@@ -44,10 +44,16 @@ export class TypingManager {
     userId: UserId,
     roomId: string,
     roomType: RoomType
-  ): void {
+  ): TypingSession | undefined {
     const key = this.getKey(roomType, roomId, userId);
 
-    this.typingSessions.delete(key);
+    const session = this.typingSessions.get(key);
+
+    if (session) {
+      this.typingSessions.delete(key);
+    }
+
+    return session;
   }
 
   public stopAllTyping(userId: UserId): TypingSession[] {
