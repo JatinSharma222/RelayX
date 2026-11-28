@@ -20,6 +20,8 @@ import { MessageService } from "../services/message-service";
 import { RoomAuthorizationService } from "../services/room-authorization-service";
 import { PresenceManager } from "../managers/presence-manager";
 
+import { RateLimiter } from "../managers/rate-limit-manager";
+
 export class WebSocketGateway {
   private wss: WebSocketServer;
 
@@ -37,6 +39,15 @@ export class WebSocketGateway {
   private aliveSockets = new Map<WebSocket, boolean>();
   private heartbeatInterval!: ReturnType<typeof setInterval>;
   private isShuttingDown: boolean = false;
+  private rateLimiter: RateLimiter;
+
+  private rateLimits = {
+    MESSAGE_SEND: { limit: 10, windowMs: 10_000 },
+    HISTORY_REQUEST: { limit: 5, windowMs: 10_000 },
+    ROOM_JOIN: { limit: 10, windowMs: 10_000 },
+    TYPING_UPDATE: { limit: 20, windowMs: 10_000 },
+    PRESENCE_SET: { limit: 5, windowMs: 10_000 },
+  } as const;
 
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
@@ -47,6 +58,7 @@ export class WebSocketGateway {
     this.messageService = new MessageService();
     this.roomAuthorizationService = new RoomAuthorizationService();
     this.presenceManager = new PresenceManager();
+    this.rateLimiter = new RateLimiter();
 
     this.initialize();
   }
@@ -296,6 +308,18 @@ export class WebSocketGateway {
       return;
     }
 
+    if (!this.checkRateLimit(user.id, "ROOM_JOIN")) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "RATE_LIMITED",
+          message: "Too many room join requests. Please try again later.",
+        },
+      });
+
+      return;
+    }
+
     if (roomType === "CHANNEL") {
       const hasAccess =
         await this.roomAuthorizationService.canAccessChannel(
@@ -361,6 +385,18 @@ export class WebSocketGateway {
           message: "Authentication required",
         },
       });
+      return;
+    }
+
+    if (!this.checkRateLimit(user.id, "MESSAGE_SEND")) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "RATE_LIMITED",
+          message: "Too many messages. Please try again later.",
+        },
+      });
+
       return;
     }
 
@@ -463,6 +499,18 @@ export class WebSocketGateway {
       return;
     }
 
+    if (!this.checkRateLimit(user.id, "HISTORY_REQUEST")) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "RATE_LIMITED",
+          message: "Too many history requests. Please try again later.",
+        },
+      });
+
+      return;
+    }
+
     if (event.payload.roomType === "CHANNEL") {
       const hasAccess =
         await this.roomAuthorizationService.canAccessChannel(
@@ -529,6 +577,19 @@ export class WebSocketGateway {
       return;
 
     }
+
+    if (!this.checkRateLimit(user.id, "TYPING_UPDATE")) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "RATE_LIMITED",
+          message: "Too many typing update requests. Please try again later.",
+        },
+      });
+
+      return;
+    }
+
     if (event.payload.roomType === "CHANNEL") {
 
       const hasAccess =
@@ -639,6 +700,18 @@ export class WebSocketGateway {
       return;
     }
 
+    if (!this.checkRateLimit(user.id, "PRESENCE_SET")) {
+      this.send(ws, {
+        type: "ERROR",
+        payload: {
+          code: "RATE_LIMITED",
+          message: "Too many Presence requests. Please try again later.",
+        },
+      });
+
+      return;
+    }
+
     const { status } = event.payload;
 
     if (!["ONLINE", "IDLE", "DND"].includes(status)) {
@@ -690,6 +763,8 @@ export class WebSocketGateway {
 
     clearInterval(this.heartbeatInterval);
 
+    this.rateLimiter.shutdown();
+
     // Stop accepting new connections
     this.wss.close(() => {
       console.log("WebSocket server closed");
@@ -699,6 +774,20 @@ export class WebSocketGateway {
     for (const client of this.wss.clients) {
       client.close(1001, "Server shutting down");
     }
+  }
+
+  private checkRateLimit(
+    userId: UserId,
+    eventType: keyof typeof this.rateLimits
+  ): boolean {
+    const config = this.rateLimits[eventType];
+
+    return this.rateLimiter.allow(
+      userId,
+      eventType,
+      config.limit,
+      config.windowMs
+    );
   }
 
 }
