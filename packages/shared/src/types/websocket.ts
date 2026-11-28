@@ -1,68 +1,98 @@
-
+import { z } from 'zod';
 
 import { type UserId, type PublicUser } from './user';
 import { type Message } from './message';
 import { type UserPresence } from './presence';
 
-export type RoomType = 'CHANNEL' | 'CONVERSATION';
-
 // ==========================================
-// Client -> Server Events
+// Shared WebSocket Types
 // ==========================================
 
-export type ClientWsEvent =
-  | {
-    type: 'AUTH';
-    payload: {
-      token: string;
-    };
-  }
-  | {
-    type: 'ROOM_JOIN';
-    payload: {
-      roomId: string;
-      roomType: RoomType;
-    };
-  }
-  | {
-    type: 'ROOM_LEAVE';
-    payload: {
-      roomId: string;
-      roomType: RoomType;
-    };
-  }
-  | {
-    type: 'MESSAGE_SEND';
-    payload: {
-      clientTempId: string;
-      roomId: string;
-      roomType: RoomType;
-      content: string;
-    };
-  }
-  | {
-    type: 'TYPING_UPDATE';
-    payload: {
-      roomId: string;
-      roomType: RoomType;
-      isTyping: boolean;
-    };
-  }
-  | {
-    type: 'PRESENCE_SET';
-    payload: {
-      status: 'ONLINE' | 'IDLE' | 'DND';
-    };
-  }
-  | {
-    type: "HISTORY_REQUEST";
-    payload: {
-      roomId: string;
-      roomType: RoomType;
-      limit: number;
-      before?: string;
-    };
-  };
+export const RoomTypeSchema = z.enum([
+  'CHANNEL',
+  'CONVERSATION',
+]);
+
+export type RoomType = z.infer<typeof RoomTypeSchema>;
+
+// ==========================================
+// Client -> Server Event Schemas
+// ==========================================
+
+export const AuthEventSchema = z.object({
+  type: z.literal('AUTH'),
+  payload: z.object({
+    token: z.string().min(1),
+  }),
+});
+
+export const RoomJoinEventSchema = z.object({
+  type: z.literal('ROOM_JOIN'),
+  payload: z.object({
+    roomId: z.string().min(1),
+    roomType: RoomTypeSchema,
+  }),
+});
+
+export const RoomLeaveEventSchema = z.object({
+  type: z.literal('ROOM_LEAVE'),
+  payload: z.object({
+    roomId: z.string().min(1),
+    roomType: RoomTypeSchema,
+  }),
+});
+
+export const MessageSendEventSchema = z.object({
+  type: z.literal('MESSAGE_SEND'),
+  payload: z.object({
+    clientTempId: z.string().min(1),
+    roomId: z.string().min(1),
+    roomType: RoomTypeSchema,
+    content: z.string().min(1).max(4000),
+  }),
+});
+
+export const TypingUpdateEventSchema = z.object({
+  type: z.literal('TYPING_UPDATE'),
+  payload: z.object({
+    roomId: z.string().min(1),
+    roomType: RoomTypeSchema,
+    isTyping: z.boolean(),
+  }),
+});
+
+export const PresenceSetEventSchema = z.object({
+  type: z.literal('PRESENCE_SET'),
+  payload: z.object({
+    status: z.enum(['ONLINE', 'IDLE', 'DND']),
+  }),
+});
+
+export const HistoryRequestEventSchema = z.object({
+  type: z.literal('HISTORY_REQUEST'),
+  payload: z.object({
+    roomId: z.string().min(1),
+    roomType: RoomTypeSchema,
+    limit: z.number().int().min(1).max(100),
+    before: z.string().min(1).optional(),
+  }),
+});
+
+// ==========================================
+// Client -> Server Event Union
+// ==========================================
+
+export const ClientWsEventSchema = z.discriminatedUnion('type', [
+  AuthEventSchema,
+  RoomJoinEventSchema,
+  RoomLeaveEventSchema,
+  MessageSendEventSchema,
+  TypingUpdateEventSchema,
+  PresenceSetEventSchema,
+  HistoryRequestEventSchema,
+]);
+
+export type ClientWsEvent = z.infer<typeof ClientWsEventSchema>;
 
 // ==========================================
 // Server -> Client Events
@@ -113,9 +143,8 @@ export type ServerWsEvent =
       message: string;
     };
   }
-
   | {
-    type: "HISTORY_RESPONSE";
+    type: 'HISTORY_RESPONSE';
     payload: {
       roomId: string;
       roomType: RoomType;

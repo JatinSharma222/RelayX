@@ -4,12 +4,13 @@ import {
   type RawData,
 } from "ws";
 
-import type {
-  UserId,
-  ServerWsEvent,
-  ClientWsEvent,
-  PublicUser,
-  RoomType,
+import {
+  ClientWsEventSchema,
+  type UserId,
+  type ServerWsEvent,
+  type ClientWsEvent,
+  type PublicUser,
+  type RoomType,
 } from "@repo/shared";
 
 import { ConnectionManager } from "../managers/connection-manager";
@@ -108,7 +109,23 @@ export class WebSocketGateway {
         return;
       }
 
-      const event = parsed as ClientWsEvent;
+      const result = ClientWsEventSchema.safeParse(parsed);
+
+      if (!result.success) {
+        this.send(ws, {
+          type: "ERROR",
+          payload: {
+            code: "BAD_REQUEST",
+            message: result.error.issues
+              .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+              .join("; "),
+          },
+        });
+
+        return;
+      }
+
+      const event = result.data;
 
       // Authentication must happen first
       if (event.type === "AUTH") {
