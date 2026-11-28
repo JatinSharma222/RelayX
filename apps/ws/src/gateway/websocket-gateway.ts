@@ -33,6 +33,7 @@ export class WebSocketGateway {
 
   private roomAuthorizationService: RoomAuthorizationService;
   private presenceManager: PresenceManager;
+  private aliveSockets = new Map<WebSocket, boolean>();
 
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
@@ -51,6 +52,12 @@ export class WebSocketGateway {
     this.wss.on("connection", (ws: WebSocket) => {
       console.log("New WebSocket connection");
 
+      this.aliveSockets.set(ws, true);
+
+      ws.on("pong", () => {
+        this.aliveSockets.set(ws, true);
+      });
+
       ws.on("message", (data: RawData) => {
         void this.handleMessage(ws, data);
       });
@@ -63,6 +70,10 @@ export class WebSocketGateway {
         console.error("WebSocket error:", error);
       });
     });
+
+    setInterval(() => {
+      this.heartbeat();
+    }, 30000);
 
     console.log("WebSocket Gateway running");
   }
@@ -226,6 +237,8 @@ export class WebSocketGateway {
   }
 
   private handleDisconnect(ws: WebSocket): void {
+    this.aliveSockets.delete(ws);
+
     const user = this.authenticatedSockets.get(ws);
 
     if (!user) return;
@@ -628,4 +641,24 @@ export class WebSocketGateway {
 
     this.broadcastPresence(user.id);
   }
+
+  private heartbeat(): void {
+
+    for (const client of this.wss.clients) {
+
+      if (client.readyState !== WebSocket.OPEN) {
+        continue;
+      }
+
+      if (this.aliveSockets.get(client) === false) {
+        client.terminate();
+        this.aliveSockets.delete(client);
+        continue;
+      }
+
+      this.aliveSockets.set(client, false);
+      client.ping();
+    }
+  }
+
 }
