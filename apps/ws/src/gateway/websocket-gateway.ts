@@ -19,8 +19,8 @@ import { AuthAdapter } from "../auth/auth-adapter";
 import { MessageService } from "../services/message-service";
 import { RoomAuthorizationService } from "../services/room-authorization-service";
 import { PresenceManager } from "../managers/presence-manager";
-
 import { RateLimiter } from "../managers/rate-limit-manager";
+import { TypingManager } from "../managers/typing-manager";
 
 export class WebSocketGateway {
   private wss: WebSocketServer;
@@ -49,6 +49,10 @@ export class WebSocketGateway {
     PRESENCE_SET: { limit: 5, windowMs: 10_000 },
   } as const;
 
+  private typingManager: TypingManager;
+
+  private typingCleanupInterval!: ReturnType<typeof setInterval>;
+
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
 
@@ -59,6 +63,7 @@ export class WebSocketGateway {
     this.roomAuthorizationService = new RoomAuthorizationService();
     this.presenceManager = new PresenceManager();
     this.rateLimiter = new RateLimiter();
+    this.typingManager = new TypingManager();
 
     this.initialize();
   }
@@ -89,6 +94,10 @@ export class WebSocketGateway {
     this.heartbeatInterval = setInterval(() => {
       this.heartbeat();
     }, 30000);
+
+    this.typingCleanupInterval = setInterval(() => {
+      this.handleExpiredTypingSessions();
+    }, 1000);
 
     console.log("WebSocket Gateway running");
   }
@@ -277,6 +286,33 @@ export class WebSocketGateway {
     this.connectionManager.removeConnection(user.id, ws);
 
     if (!this.connectionManager.isOnline(user.id)) {
+
+      const stoppedSessions = this.typingManager.stopAllTyping(user.id);
+
+      for (const session of stoppedSessions) {
+        const roomKey: RoomKey =
+          session.roomType === "CHANNEL"
+            ? `channel:${session.roomId}`
+            : `conversation:${session.roomId}`;
+
+        const members = this.roomManager.getRoomMembers(roomKey);
+
+        const typingEvent: ServerWsEvent = {
+          type: "TYPING_UPDATE",
+          payload: {
+            roomId: session.roomId,
+            roomType: session.roomType,
+            userId: session.userId,
+            username: session.username,
+            isTyping: false,
+          },
+        };
+
+        for (const memberSocket of members) {
+          this.send(memberSocket, typingEvent);
+        }
+      }
+
       this.presenceManager.updateLastSeen(user.id);
       this.broadcastPresence(user.id);
     }
@@ -647,6 +683,22 @@ export class WebSocketGateway {
 
     const members = this.roomManager.getRoomMembers(roomKey);
 
+    if (event.payload.isTyping) {
+      this.typingManager.startTyping(
+        user.id,
+        user.username,
+        event.payload.roomId,
+        event.payload.roomType,
+        5000
+      );
+    } else {
+      this.typingManager.stopTyping(
+        user.id,
+        event.payload.roomId,
+        event.payload.roomType
+      );
+    }
+
     const typingEvent: ServerWsEvent = {
       type: "TYPING_UPDATE",
       payload: {
@@ -762,6 +814,7 @@ export class WebSocketGateway {
     this.isShuttingDown = true;
 
     clearInterval(this.heartbeatInterval);
+    clearInterval(this.typingCleanupInterval);
 
     this.rateLimiter.shutdown();
 
@@ -788,6 +841,34 @@ export class WebSocketGateway {
       config.limit,
       config.windowMs
     );
+  }
+
+  private handleExpiredTypingSessions(): void {
+    const expiredSessions = this.typingManager.getExpiredSessions();
+
+    for (const session of expiredSessions) {
+      const typingEvent: ServerWsEvent = {
+        type: "TYPING_UPDATE",
+        payload: {
+          roomId: session.roomId,
+          roomType: session.roomType,
+          userId: session.userId,
+          username: session.username,
+          isTyping: false,
+        },
+      };
+
+      const roomKey: RoomKey =
+        session.roomType === "CHANNEL"
+          ? `channel:${session.roomId}`
+          : `conversation:${session.roomId}`;
+
+      const members = this.roomManager.getRoomMembers(roomKey);
+
+      for (const memberSocket of members) {
+        this.send(memberSocket, typingEvent);
+      }
+    }
   }
 
 }
